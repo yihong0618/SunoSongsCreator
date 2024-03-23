@@ -1,5 +1,5 @@
 # SunoSongsCreator
-About About High quality songs generation by https://www.suno.ai/. Reverse engineered API.
+About High quality songs generation by https://www.suno.ai/. Reverse engineered API.
 
 ## How to
 - Login to https://app.suno.ai/ and generate some smings.
