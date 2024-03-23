@@ -2,7 +2,7 @@
 About High quality songs generation by https://www.suno.ai/. Reverse engineered API.
 
 ## How to
-- Login to https://app.suno.ai/ and generate some smings.
+- Login to https://app.suno.ai/ and generate some songs.
 - Use `Chrome` or other browsers to inspect the network requests (F12 -> XHR).
 - Clone this REPO -> `git clone https://github.com/yihong0618/SunoSongsCreator.git`
 - XHR find cookie in this url -> https://clerk.suno.ai/v1/client?_clerk_js_version=4.70.5 
