@@ -93,6 +93,7 @@ class SongsGen:
             if response.json().get("detail", "") == "Unauthorized":
                 print("Token expired, renewing...")
                 self._renew()
+                time.sleep(5)
                 return
             data = response.json()
         if song_url := data.get("audio_url"):
@@ -130,11 +131,11 @@ class SongsGen:
             # TODOs support all mp3 here
             song_url = self._fetch_songs_metadata(request_ids)
             # spider rule
-            if sleep_time > 1:
+            if sleep_time > 2:
                 time.sleep(sleep_time)
                 sleep_time -= 1
             else:
-                time.sleep(1)
+                time.sleep(2)
             if not song_url:
                 print(".", end="", flush=True)
             else:
@@ -166,7 +167,7 @@ class SongsGen:
             with open(
                 os.path.join(output_dir, f"suno_{mp3_index}.mp3"), "wb"
             ) as output_file:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=1024):
                     # If the chunk is not empty, write it to the file.
                     if chunk:
                         output_file.write(chunk)
