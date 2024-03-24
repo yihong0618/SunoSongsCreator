@@ -8,6 +8,7 @@ from http.cookies import SimpleCookie
 
 from curl_cffi import requests
 from requests import get as rget
+from requests import Session as rsession
 from curl_cffi.requests import Cookies
 from fake_useragent import UserAgent
 
@@ -45,6 +46,7 @@ class SongsGen:
         auth_token = self._get_auth_token()
         HEADERS["Authorization"] = f"Bearer {auth_token}"
         self.session.headers = HEADERS
+        self.sid = None
 
     def _get_auth_token(self):
         response = self.session.get(get_session_url, impersonate=browser_version)
@@ -52,6 +54,7 @@ class SongsGen:
         sid = data.get("response").get("last_active_session_id")
         if not sid:
             raise Exception("Failed to get session id")
+        self.sid = sid
         response = self.session.post(
             exchange_token_url.format(sid=sid), impersonate=browser_version
         )
@@ -59,9 +62,10 @@ class SongsGen:
         return data.get("jwt")
 
     def _renew(self):
-        auth_token = self._get_auth_token()
-        HEADERS["Authorization"] = f"Bearer {auth_token}"
-        self.session.headers = HEADERS
+        response = self.session.post(
+            exchange_token_url.format(sid=self.sid), impersonate=browser_version
+        )
+        self.session.headers["Authorization"] = f"Bearer {response.json().get('jwt')}"
 
     @staticmethod
     def parse_cookie_string(cookie_string):
@@ -119,19 +123,18 @@ class SongsGen:
         request_ids = [i["id"] for i in songs_meta_info]
         start_wait = time.time()
         print("Waiting for results...")
-        try_index = 0
+        sleep_time = 6
         while True:
             if int(time.time() - start_wait) > 600:
                 raise Exception("Request timeout")
             # TODOs support all mp3 here
             song_url = self._fetch_songs_metadata(request_ids)
             # spider rule
-            time.sleep(1)
-            try_index += 1
-            # if try_index % 6 == 0:
-            #     self.session.headers["Authorization"] = (
-            #         f"Bearer {self._get_auth_token()}"
-            #     )
+            if sleep_time > 1:
+                time.sleep(sleep_time)
+                sleep_time -= 1
+            else:
+                time.sleep(1)
             if not song_url:
                 print(".", end="", flush=True)
             else:
@@ -155,7 +158,7 @@ class SongsGen:
             while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
                 mp3_index += 1
             print(link)
-
+            # using bare requests here.
             response = rget(link, stream=True)
             if response.status_code != 200:
                 raise Exception("Could not download song")
@@ -163,7 +166,7 @@ class SongsGen:
             with open(
                 os.path.join(output_dir, f"suno_{mp3_index}.mp3"), "wb"
             ) as output_file:
-                for chunk in response.iter_content(chunk_size=1024):
+                for chunk in response.iter_content(chunk_size=8192):
                     # If the chunk is not empty, write it to the file.
                     if chunk:
                         output_file.write(chunk)
