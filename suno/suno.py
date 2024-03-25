@@ -96,31 +96,30 @@ class SongsGen:
         id1, id2 = ids[:2]
         url = f"https://studio-api.suno.ai/api/feed/?ids={id1}%2C{id2}"
         response = self.session.get(url, impersonate=browser_version)
-        try:
-            data = response.json()
-            if type(data) == dict:
-                print(data)
-                data = [data]
-            self.now_data = data
-        except:
-            if response.json().get("detail", "") == "Unauthorized":
+        data = response.json()
+        if type(data) == dict:
+            if data.get("detail", "") == "Unauthorized":
                 print("Token expired, renewing...")
                 self.retry_time += 1
-                if self.retry_time > 3:
+                if self.retry_time > 2:
                     song_name, lyric = self._parse_lyrics(self.now_data[0])
                     self.song_info_dict["song_name"] = song_name
                     self.song_info_dict["lyric"] = lyric
                     self.song_info_dict["song_url"] = (
                         f"https://audiopipe.suno.ai/?item_id={id1}"
                     )
-                    print("will sleep 45 and try to download")
-                    time.sleep(45)
+                    print("will sleep 30 and try to download")
+                    time.sleep(30)
                     # Done here
                     return True
                 self._renew()
                 time.sleep(5)
+                return False
+            else:
+                data = [data]
+        # renew now data
+        self.now_data = data
         try:
-
             for d in data:
                 # only get one url for now
                 # and early return
