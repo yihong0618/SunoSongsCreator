@@ -186,6 +186,48 @@ class SongsGen:
                 break
         # keep the song info dict as old api
         return self.song_info_dict
+    
+    def get_songs_custom(self, prompt: str, genre: str, instrumental : str = False) -> dict:
+        url = f"{base_url}/api/generate/v2/"
+        self.session.headers["user-agent"] = ua.random
+        payload = {
+            "mv": "chirp-v3-0",
+            "prompt": prompt,
+            "tags": genre,
+            "make_instrumental": instrumental,
+        }
+        response = self.session.post(
+            url,
+            data=json.dumps(payload),
+            impersonate=browser_version,
+        )
+        if not response.ok:
+            print(response.text)
+            raise Exception(f"Error response {str(response)}")
+        response_body = response.json()
+        songs_meta_info = response_body["clips"]
+        request_ids = [i["id"] for i in songs_meta_info]
+        start_wait = time.time()
+        print("Waiting for results...")
+        sleep_time = 10
+        while True:
+            if int(time.time() - start_wait) > 600:
+                raise Exception("Request timeout")
+            # TODOs support all mp3 here
+            song_info = self._fetch_songs_metadata(request_ids)
+            # spider rule
+            if sleep_time > 2:
+                time.sleep(sleep_time)
+                sleep_time -= 2
+            else:
+                time.sleep(2)
+
+            if not song_info:
+                print(".", end="", flush=True)
+            else:
+                break
+        # keep the song info dict as old api
+        return self.song_info_dict
 
     def save_songs(
         self,
@@ -224,6 +266,67 @@ class SongsGen:
             encoding="utf-8",
         ) as lyric_file:
             lyric_file.write(f"{song_name}\n\n{lyric}")
+            
+            
+    def save_songs_custom(
+        self,
+        prompt: str,
+        genre: str,
+        output_dir: str,
+        instrumental: str = False
+    ) -> None:
+        mp3_index = 0
+        try:
+            self.get_songs_custom(prompt, genre, instrumental)  # make the info dict
+            song_name = self.song_info_dict["song_name"]
+            lyric = self.song_info_dict["lyric"]
+            link = self.song_info_dict["song_url"]
+        except Exception as e:
+            print(e)
+            raise
+        with contextlib.suppress(FileExistsError):
+            os.mkdir(output_dir)
+        print()
+        while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
+            mp3_index += 1
+        print(link)
+        response = rget(link, allow_redirects=False, stream=True)
+        if response.status_code != 200:
+            raise Exception("Could not download song")
+        # save response to file
+        with open(
+            os.path.join(output_dir, f"suno_{mp3_index + 1}.mp3"), "wb"
+        ) as output_file:
+            for chunk in response.iter_content(chunk_size=1024):
+                # If the chunk is not empty, write it to the file.
+                if chunk:
+                    output_file.write(chunk)
+        with open(
+            os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
+            "w",
+            encoding="utf-8",
+        ) as lyric_file:
+            lyric_file.write(f"{song_name}\n\n{lyric}")
+            
+            
+    def get_mp3(self, link: str, stream: bool = False):
+        """
+        Fetches the MP3 file from a given link. Can return the entire file
+        as bytes or stream it in chunks based on the 'stream' parameter.
+
+        :param link: The URL to the MP3 file.
+        :param stream: Determines if the MP3 should be streamed (True) or returned as a full object (False).
+        :return: If stream is False, returns the MP3 file content as bytes.
+                If stream is True, returns a generator yielding the file in chunks.
+        """
+        response = self.session.get(link, stream=True)
+        if response.status_code == 200:
+            if stream:
+                return response.iter_content()
+            else:
+                return b"".join(response.iter_content())
+        else:
+            raise Exception(f"Failed to download MP3 from {link}, status code: {response.status_code}")
 
 
 def main():
