@@ -98,6 +98,9 @@ class SongsGen:
         response = self.session.get(url, impersonate=browser_version)
         try:
             data = response.json()
+            if type(data) == dict:
+                print(data)
+                data = [data]
             self.now_data = data
         except:
             if response.json().get("detail", "") == "Unauthorized":
