@@ -87,7 +87,7 @@ class SongsGen:
     def _parse_lyrics(self, data: dict) -> Tuple[str, str]:
         song_name = data.get("title", "")
         mt = data.get("metadata")
-        if not mt or not song_name:
+        if not mt: # Remove checking for title because custom songs have no title if not specified
             return "", ""
         lyrics = re.sub(r"\[.*?\]", "", mt.get("prompt"))
         return song_name, lyrics
@@ -121,7 +121,7 @@ class SongsGen:
         self.now_data = data
         try:
             for d in data:
-                # only get one url for now
+                # only get one url for now TODO: See if possible for both urls
                 # and early return
                 if audio_url := d.get("audio_url"):
                     song_name, lyric = self._parse_lyrics(d)
