@@ -43,8 +43,7 @@ class SongsGen:
         self.retry_time = 0
 
     def _get_auth_token(self):
-        response = self.session.get(get_session_url,
-                                    impersonate=browser_version)
+        response = self.session.get(get_session_url, impersonate=browser_version)
         data = response.json()
         r = data.get("response")
         sid = None
@@ -77,17 +76,16 @@ class SongsGen:
     def get_limit_left(self) -> int:
         self.session.headers["user-agent"] = ua.random
         r = self.session.get(
-            "https://studio-api.suno.ai/api/billing/info/",
-            impersonate=browser_version
+            "https://studio-api.suno.ai/api/billing/info/", impersonate=browser_version
         )
-        return int(r.json()["total_credits_left"] / 5)
+        return int(r.json()["total_credits_left"] / 10)
 
     def _parse_lyrics(self, data: dict) -> Tuple[str, str]:
-        song_name = data.get('title', '')
-        mt = data.get('metadata')
+        song_name = data.get("title", "")
+        mt = data.get("metadata")
         if not mt or not song_name:
-            return '', ''
-        lyrics = re.sub(r"\[.*?\]", "", mt.get('prompt'))
+            return "", ""
+        lyrics = re.sub(r"\[.*?\]", "", mt.get("prompt"))
         return song_name, lyrics
 
     def _fetch_songs_metadata(self, ids):
@@ -101,22 +99,24 @@ class SongsGen:
                 print("Token expired, renewing...")
                 self.retry_time += 1
                 if self.retry_time > 3:
-                    raise Exception("Token expired")
+                    raise Exception("Token expired will renew and sleep 5 seconds")
                 self._renew()
                 time.sleep(5)
         data = response.json()
-        rs = {
-            'song_name': '',
-            'lyric': '',
-            'song_urls': []
+        song_info_dict = {
+            "song_name": "",
+            "lyric": "",
+            "song_url": "",
         }
         for d in data:
-            if s_url := d.get('audio_url'):
-                rs['song_urls'].append(s_url)
-        song_name, lyric = self._parse_lyrics(data[0])
-        rs['song_name'] = song_name
-        rs['lyric'] = lyric
-        return rs
+            # only get one url for now
+            # and early return
+            if audio_url := d.get("audio_url"):
+                song_info_dict["song_url"] = audio_url
+                song_name, lyric = self._parse_lyrics(data[0])
+                song_info_dict["song_name"] = song_name
+                song_info_dict["lyric"] = lyric
+                return song_info_dict
 
     def get_songs(self, prompt: str) -> dict:
         url = f"{base_url}/api/generate/v2/"
@@ -153,55 +153,50 @@ class SongsGen:
             else:
                 time.sleep(2)
 
-            if len(song_info['song_urls']) != 2:
+            if not song_info:
                 print(".", end="", flush=True)
             else:
                 return song_info
 
     def save_songs(
-            self,
-            prompt: str,
-            output_dir: str,
+        self,
+        prompt: str,
+        output_dir: str,
     ) -> None:
         mp3_index = 0
         try:
-            song_name, lyric, links = self.get_songs(prompt).values()
+            song_name, lyric, link = self.get_songs(prompt).values()
         except Exception as e:
             print(e)
             raise
         with contextlib.suppress(FileExistsError):
             os.mkdir(output_dir)
         print()
-        for link in links:
-            while os.path.exists(
-                    os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
-                mp3_index += 1
-            print(link)
-            response = rget(link, stream=True)
-            if response.status_code != 200:
-                raise Exception("Could not download song")
-            # save response to file
-            with open(
-                    os.path.join(output_dir,
-                                 f"suno_{mp3_index + 1}.mp3"),
-                    "wb"
-            ) as output_file:
-                for chunk in response.iter_content(chunk_size=1024):
-                    # If the chunk is not empty, write it to the file.
-                    if chunk:
-                        output_file.write(chunk)
+        while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
+            mp3_index += 1
+        print(link)
+        response = rget(link, allow_redirects=False, stream=True)
+        if response.status_code != 200:
+            raise Exception("Could not download song")
+        # save response to file
         with open(
-                os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
-                'w',
-                encoding='utf-8'
+            os.path.join(output_dir, f"suno_{mp3_index + 1}.mp3"), "wb"
+        ) as output_file:
+            for chunk in response.iter_content(chunk_size=1024):
+                # If the chunk is not empty, write it to the file.
+                if chunk:
+                    output_file.write(chunk)
+        with open(
+            os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
+            "w",
+            encoding="utf-8",
         ) as lyric_file:
-            lyric_file.write(f'{song_name}\n\n{lyric}')
+            lyric_file.write(f"{song_name}\n\n{lyric}")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-U", help="Auth cookie from browser", type=str,
-                        default="")
+    parser.add_argument("-U", help="Auth cookie from browser", type=str, default="")
     parser.add_argument(
         "--prompt",
         help="Prompt to generate songs for",
@@ -223,7 +218,7 @@ def main():
     song_generator = SongsGen(
         os.environ.get("SUNO_COOKIE") or args.U,
     )
-    print(f"{song_generator.get_limit_left()} songs left")
+    print(f"{song_generator.get_limit_left()} times left")
     song_generator.save_songs(
         prompt=args.prompt,
         output_dir=args.output_dir,
