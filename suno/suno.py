@@ -24,14 +24,7 @@ base_url = "https://studio-api.suno.ai"
 browser_version = "edge101"
 
 HEADERS = {
-    "Origin": base_url,
-    "Referer": base_url + "/",
-    "DNT": "1",
     "Accept-Encoding": "gzip, deflate, br",
-    "Content-Type": "application/json",
-    "Pragma": "no-cache",
-    "Cache-Control": "no-cache",
-    "TE": "trailers",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) \
         Gecko/20100101 Firefox/117.0",
 }
@@ -47,6 +40,7 @@ class SongsGen:
         HEADERS["Authorization"] = f"Bearer {auth_token}"
         self.session.headers = HEADERS
         self.sid = None
+        self.retry_time = 0
 
     def _get_auth_token(self):
         response = self.session.get(get_session_url, impersonate=browser_version)
@@ -65,6 +59,7 @@ class SongsGen:
         response = self.session.post(
             exchange_token_url.format(sid=self.sid), impersonate=browser_version
         )
+        print(response.json())
         self.session.headers["Authorization"] = f"Bearer {response.json().get('jwt')}"
 
     @staticmethod
@@ -92,6 +87,9 @@ class SongsGen:
         except:
             if response.json().get("detail", "") == "Unauthorized":
                 print("Token expired, renewing...")
+                self.retry_time += 1
+                if self.retry_time > 3:
+                    raise Exception("Token expired")
                 self._renew()
                 time.sleep(5)
                 return
@@ -124,7 +122,7 @@ class SongsGen:
         request_ids = [i["id"] for i in songs_meta_info]
         start_wait = time.time()
         print("Waiting for results...")
-        sleep_time = 6
+        sleep_time = 10
         while True:
             if int(time.time() - start_wait) > 600:
                 raise Exception("Request timeout")
@@ -133,7 +131,7 @@ class SongsGen:
             # spider rule
             if sleep_time > 2:
                 time.sleep(sleep_time)
-                sleep_time -= 1
+                sleep_time -= 2
             else:
                 time.sleep(2)
             if not song_url:
