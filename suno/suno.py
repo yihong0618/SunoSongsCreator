@@ -192,7 +192,7 @@ class SongsGen:
         self.session.headers["user-agent"] = ua.random
         payload = {
             "mv": "chirp-v3-0",
-            "prompt": prompt,
+            "prompt": "" if instrumental else prompt,
             "tags": genre,
             "make_instrumental": instrumental,
         }
