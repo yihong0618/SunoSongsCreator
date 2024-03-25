@@ -2,18 +2,18 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import time
-from rich import print
 from http.cookies import SimpleCookie
+from typing import Tuple
 
 from curl_cffi import requests
-from requests import get as rget
-from requests import Session as rsession
 from curl_cffi.requests import Cookies
 from fake_useragent import UserAgent
+from requests import get as rget
+from rich import print
 
 ua = UserAgent(browsers=["edge"])
-
 
 get_session_url = "https://clerk.suno.ai/v1/client?_clerk_js_version=4.70.5"
 exchange_token_url = (
@@ -49,9 +49,13 @@ class SongsGen:
         self.sid = None
 
     def _get_auth_token(self):
-        response = self.session.get(get_session_url, impersonate=browser_version)
+        response = self.session.get(get_session_url,
+                                    impersonate=browser_version)
         data = response.json()
-        sid = data.get("response").get("last_active_session_id")
+        r = data.get("response")
+        sid = None
+        if r:
+            sid = r.get("last_active_session_id")
         if not sid:
             raise Exception("Failed to get session id")
         self.sid = sid
@@ -65,7 +69,8 @@ class SongsGen:
         response = self.session.post(
             exchange_token_url.format(sid=self.sid), impersonate=browser_version
         )
-        self.session.headers["Authorization"] = f"Bearer {response.json().get('jwt')}"
+        self.session.headers[
+            "Authorization"] = f"Bearer {response.json().get('jwt')}"
 
     @staticmethod
     def parse_cookie_string(cookie_string):
@@ -79,9 +84,18 @@ class SongsGen:
     def get_limit_left(self) -> int:
         self.session.headers["user-agent"] = ua.random
         r = self.session.get(
-            "https://studio-api.suno.ai/api/billing/info/", impersonate=browser_version
+            "https://studio-api.suno.ai/api/billing/info/",
+            impersonate=browser_version
         )
         return int(r.json()["total_credits_left"] / 5)
+
+    def _parse_lyrics(self, data: dict) -> Tuple[str, str]:
+        song_name = data.get('title', '')
+        mt = data.get('metadata')
+        if not mt or not song_name:
+            return '', ''
+        lyrics = re.sub(r"\[.*?\]", "", mt.get('prompt'))
+        return song_name, lyrics
 
     def _fetch_songs_metadata(self, ids):
         id1, id2 = ids[:2]
@@ -94,15 +108,21 @@ class SongsGen:
                 print("Token expired, renewing...")
                 self._renew()
                 time.sleep(5)
-                return
-            data = response.json()
-        if song_url := data.get("audio_url"):
-            # TODO support all mp3 here
-            return song_url
-        else:
-            return None
+        data = response.json()
+        rs = {
+            'song_name': '',
+            'lyric': '',
+            'song_urls': []
+        }
+        for d in data:
+            if s_url := d.get('audio_url'):
+                rs['song_urls'].append(s_url)
+        song_name, lyric = self._parse_lyrics(data[0])
+        rs['song_name'] = song_name
+        rs['lyric'] = lyric
+        return rs
 
-    def get_songs(self, prompt: str) -> list:
+    def get_songs(self, prompt: str) -> dict:
         url = f"{base_url}/api/generate/v2/"
         self.session.headers["user-agent"] = ua.random
         payload = {
@@ -129,26 +149,27 @@ class SongsGen:
             if int(time.time() - start_wait) > 600:
                 raise Exception("Request timeout")
             # TODOs support all mp3 here
-            song_url = self._fetch_songs_metadata(request_ids)
+            song_info = self._fetch_songs_metadata(request_ids)
             # spider rule
             if sleep_time > 2:
                 time.sleep(sleep_time)
                 sleep_time -= 1
             else:
                 time.sleep(2)
-            if not song_url:
+
+            if len(song_info['song_urls']) != 2:
                 print(".", end="", flush=True)
             else:
-                return [song_url]
+                return song_info
 
     def save_songs(
-        self,
-        prompt: str,
-        output_dir: str,
+            self,
+            prompt: str,
+            output_dir: str,
     ) -> None:
         mp3_index = 0
         try:
-            links = self.get_songs(prompt)
+            song_name, lyric, links = self.get_songs(prompt).values()
         except Exception as e:
             print(e)
             raise
@@ -156,27 +177,35 @@ class SongsGen:
             os.mkdir(output_dir)
         print()
         for link in links:
-            while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
+            while os.path.exists(
+                    os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
                 mp3_index += 1
             print(link)
-            # using bare requests here.
             response = rget(link, stream=True)
             if response.status_code != 200:
                 raise Exception("Could not download song")
             # save response to file
             with open(
-                os.path.join(output_dir, f"suno_{mp3_index}.mp3"), "wb"
+                    os.path.join(output_dir,
+                                 f"suno_{mp3_index + 1}.mp3"),
+                    "wb"
             ) as output_file:
                 for chunk in response.iter_content(chunk_size=1024):
                     # If the chunk is not empty, write it to the file.
                     if chunk:
                         output_file.write(chunk)
-            mp3_index += 1
+        with open(
+                os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
+                'w',
+                encoding='utf-8'
+        ) as lyric_file:
+            lyric_file.write(f'{song_name}\n\n{lyric}')
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-U", help="Auth cookie from browser", type=str, default="")
+    parser.add_argument("-U", help="Auth cookie from browser", type=str,
+                        default="")
     parser.add_argument(
         "--prompt",
         help="Prompt to generate songs for",
