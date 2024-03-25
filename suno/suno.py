@@ -41,6 +41,10 @@ class SongsGen:
         self.session.headers = HEADERS
         self.sid = None
         self.retry_time = 0
+        # make the song_info_dict global since we can get the lyrics and song name first
+        self.song_info_dict = {}
+        # now data
+        self.now_data = {}
 
     def _get_auth_token(self):
         response = self.session.get(get_session_url, impersonate=browser_version)
@@ -93,30 +97,51 @@ class SongsGen:
         url = f"https://studio-api.suno.ai/api/feed/?ids={id1}%2C{id2}"
         response = self.session.get(url, impersonate=browser_version)
         try:
-            data = response.json()[0]
+            data = response.json()
+            self.now_data = data
         except:
             if response.json().get("detail", "") == "Unauthorized":
                 print("Token expired, renewing...")
                 self.retry_time += 1
                 if self.retry_time > 3:
-                    raise Exception("Token expired will renew and sleep 5 seconds")
+                    song_name, lyric = self._parse_lyrics(self.now_data[0])
+                    self.song_info_dict["song_name"] = song_name
+                    self.song_info_dict["lyric"] = lyric
+                    self.song_info_dict["song_url"] = (
+                        f"https://audiopipe.suno.ai/?item_id={id1}"
+                    )
+                    print("will sleep 45 and try to download")
+                    time.sleep(45)
+                    # Done here
+                    return True
                 self._renew()
                 time.sleep(5)
-        data = response.json()
-        song_info_dict = {
-            "song_name": "",
-            "lyric": "",
-            "song_url": "",
-        }
-        for d in data:
-            # only get one url for now
-            # and early return
-            if audio_url := d.get("audio_url"):
-                song_info_dict["song_url"] = audio_url
-                song_name, lyric = self._parse_lyrics(data[0])
-                song_info_dict["song_name"] = song_name
-                song_info_dict["lyric"] = lyric
-                return song_info_dict
+        try:
+
+            for d in data:
+                # only get one url for now
+                # and early return
+                if audio_url := d.get("audio_url"):
+                    song_name, lyric = self._parse_lyrics(d)
+                    self.song_info_dict["song_name"] = song_name
+                    self.song_info_dict["lyric"] = lyric
+                    self.song_info_dict["song_url"] = audio_url
+                    return True
+            return False
+        except Exception as e:
+            print(e)
+            # since we only get the music_id is ok
+            # so we can make the id here and sleep some time
+            print("Will sleep 45s and get the music url")
+            time.sleep(45)
+            song_name, lyric = self._parse_lyrics(self.now_data[0])
+            self.song_info_dict["song_name"] = song_name
+            self.song_info_dict["lyric"] = lyric
+            self.song_info_dict["song_url"] = (
+                f"https://audiopipe.suno.ai/?item_id={id1}"
+            )
+            # Done here
+            return True
 
     def get_songs(self, prompt: str) -> dict:
         url = f"{base_url}/api/generate/v2/"
@@ -156,7 +181,9 @@ class SongsGen:
             if not song_info:
                 print(".", end="", flush=True)
             else:
-                return song_info
+                break
+        # keep the song info dict as old api
+        return self.song_info_dict
 
     def save_songs(
         self,
@@ -165,7 +192,10 @@ class SongsGen:
     ) -> None:
         mp3_index = 0
         try:
-            song_name, lyric, link = self.get_songs(prompt).values()
+            self.get_songs(prompt)  # make the info dict
+            song_name = self.song_info_dict["song_name"]
+            lyric = self.song_info_dict["lyric"]
+            link = self.song_info_dict["song_url"]
         except Exception as e:
             print(e)
             raise
