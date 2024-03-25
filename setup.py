@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="suno_songs",
-    version="0.1.5",
+    version="0.2.0",
     author="yihong0618",
     author_email="zouzou0208@gmail.com",
     description="High quality image generation by ideogram.ai. Reverse engineered API.",
