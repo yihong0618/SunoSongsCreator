@@ -6,6 +6,7 @@ import re
 import time
 from http.cookies import SimpleCookie
 from typing import Tuple
+import random
 
 from curl_cffi import requests
 from curl_cffi.requests import Cookies
@@ -33,6 +34,26 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) \
         Gecko/20100101 Firefox/117.0",
 }
+
+MUSIC_GENRE_LIST = [
+    "African",
+    "Asian",
+    "South and southeast Asian",
+    "Avant-garde",
+    "Blues",
+    "Caribbean and Caribbean-influenced",
+    "Comedy",
+    "Country",
+    "Easy listening",
+    "Electronic",
+    "Folk",
+    "Hip hop",
+    "Jazz",
+    "Latin",
+    "Pop",
+    "R&B and soul",
+    "Rock",
+]
 
 
 class SongsGen:
@@ -172,7 +193,10 @@ class SongsGen:
             payload["gpt_description_prompt"] = ""
             payload["title"] = title
             if not tags:
-                payload["tags"] = "pop"
+                payload["tags"] = random.choice(MUSIC_GENRE_LIST)
+            else:
+                payload["tags"] = tags
+            print(payload)
         response = self.session.post(
             url,
             data=json.dumps(payload),
@@ -209,7 +233,7 @@ class SongsGen:
     def save_songs(
         self,
         prompt: str,
-        output_dir: str,
+        output_dir: str = "./output",
         tags: Union[str, None] = None,
         title: Union[str, None] = None,
         is_custom: bool = False,
