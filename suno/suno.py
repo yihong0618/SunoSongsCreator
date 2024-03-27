@@ -13,6 +13,10 @@ from fake_useragent import UserAgent
 from requests import get as rget
 from rich import print
 
+from dotenv import load_dotenv, find_dotenv
+
+_ = load_dotenv(find_dotenv())
+
 ua = UserAgent(browsers=["edge"])
 
 get_session_url = "https://clerk.suno.ai/v1/client?_clerk_js_version=4.70.5"

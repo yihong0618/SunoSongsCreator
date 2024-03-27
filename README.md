@@ -7,7 +7,7 @@ About High quality songs generation by https://www.suno.ai/. Reverse engineered 
 - Clone this REPO -> `git clone https://github.com/yihong0618/SunoSongsCreator.git`
 - XHR find cookie in this url -> https://clerk.suno.ai/v1/client?_clerk_js_version=4.70.5 
 - Copy the cookie.
-- Export SUNO_COOKIE='xxxxx'.
+- You can import the cookie using `export SUNO_COOKIE='<your-suno-cookie>'` or rename `.env.example` to `.env` and fill in `SUNO_COOKIE`.
 
 ## Usage
 
