@@ -14,6 +14,7 @@ from requests import get as rget
 from rich import print
 
 from dotenv import load_dotenv, find_dotenv
+
 _ = load_dotenv(find_dotenv())
 
 ua = UserAgent(browsers=["edge"])
