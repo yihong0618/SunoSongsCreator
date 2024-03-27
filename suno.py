@@ -147,10 +147,15 @@ class SongsGen:
 
     def get_songs(self, gptprompt: str = None, prompt: str = None, tags: str = None, title: str = None) -> dict:
         # Check that either gptprompt is provided alone, or prompt, tags, and title are provided together without gptprompt
+        print('gptprompt',gptprompt,'\n','prompt',prompt is None,'\n','tags',tags is None,'\n','title',title is None)
         if gptprompt is not None:
             if prompt is not None or tags is not None or title is not None:
                 raise ValueError("If gptprompt is provided, prompt, tags, and title should not be.")
-        else:
+            prompt = ""
+            tags = ""
+            title = ""
+        elif gptprompt is None:
+            gptprompt = ""
             if not all([prompt, tags, title]):
                 raise ValueError("If gptprompt is not provided, prompt, tags, and title must all be provided.")
         url = f"{base_url}/api/generate/v2/"
@@ -198,7 +203,7 @@ class SongsGen:
 
     def save_songs(
         self,
-        gptprompt: str=None,
+        gptprompt: str= None,
         prompt: str = None,
         tags: str = None,
         title: str = None,
