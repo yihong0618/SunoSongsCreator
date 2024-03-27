@@ -12,6 +12,7 @@ from curl_cffi.requests import Cookies
 from fake_useragent import UserAgent
 from requests import get as rget
 from rich import print
+from typing import Union
 
 ua = UserAgent(browsers=["edge"])
 
@@ -87,7 +88,9 @@ class SongsGen:
     def _parse_lyrics(self, data: dict) -> Tuple[str, str]:
         song_name = data.get("title", "")
         mt = data.get("metadata")
-        if not mt: # Remove checking for title because custom songs have no title if not specified
+        if (
+            not mt
+        ):  # Remove checking for title because custom songs have no title if not specified
             return "", ""
         lyrics = re.sub(r"\[.*?\]", "", mt.get("prompt"))
         return song_name, lyrics
@@ -145,7 +148,13 @@ class SongsGen:
             # Done here
             return True
 
-    def get_songs(self, prompt: str) -> dict:
+    def get_songs(
+        self,
+        prompt: str,
+        tags: Union[str, None] = None,
+        title: str = "",
+        is_custom: bool = False,
+    ) -> dict:
         url = f"{base_url}/api/generate/v2/"
         self.session.headers["user-agent"] = ua.random
         payload = {
@@ -154,48 +163,12 @@ class SongsGen:
             "prompt": "",
             "make_instrumental": False,
         }
-        response = self.session.post(
-            url,
-            data=json.dumps(payload),
-            impersonate=browser_version,
-        )
-        if not response.ok:
-            print(response.text)
-            raise Exception(f"Error response {str(response)}")
-        response_body = response.json()
-        songs_meta_info = response_body["clips"]
-        request_ids = [i["id"] for i in songs_meta_info]
-        start_wait = time.time()
-        print("Waiting for results...")
-        sleep_time = 10
-        while True:
-            if int(time.time() - start_wait) > 600:
-                raise Exception("Request timeout")
-            # TODOs support all mp3 here
-            song_info = self._fetch_songs_metadata(request_ids)
-            # spider rule
-            if sleep_time > 2:
-                time.sleep(sleep_time)
-                sleep_time -= 2
-            else:
-                time.sleep(2)
-
-            if not song_info:
-                print(".", end="", flush=True)
-            else:
-                break
-        # keep the song info dict as old api
-        return self.song_info_dict
-    
-    def get_songs_custom(self, prompt: str, genre: str, instrumental : str = False) -> dict:
-        url = f"{base_url}/api/generate/v2/"
-        self.session.headers["user-agent"] = ua.random
-        payload = {
-            "mv": "chirp-v3-0",
-            "prompt": "" if instrumental else prompt,
-            "tags": genre,
-            "make_instrumental": instrumental,
-        }
+        if is_custom:
+            payload["prompt"] = prompt
+            payload["gpt_description_prompt"] = ""
+            payload["title"] = title
+            if not tags:
+                payload["tags"] = "pop"
         response = self.session.post(
             url,
             data=json.dumps(payload),
@@ -233,10 +206,15 @@ class SongsGen:
         self,
         prompt: str,
         output_dir: str,
+        tags: Union[str, None] = None,
+        title: Union[str, None] = None,
+        is_custom: bool = False,
     ) -> None:
         mp3_index = 0
         try:
-            self.get_songs(prompt)  # make the info dict
+            self.get_songs(
+                prompt, tags=tags, title=title, is_custom=is_custom
+            )  # make the info dict
             song_name = self.song_info_dict["song_name"]
             lyric = self.song_info_dict["lyric"]
             link = self.song_info_dict["song_url"]
@@ -260,73 +238,14 @@ class SongsGen:
                 # If the chunk is not empty, write it to the file.
                 if chunk:
                     output_file.write(chunk)
+        if not song_name:
+            song_name = "Untitled"
         with open(
             os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
             "w",
             encoding="utf-8",
         ) as lyric_file:
             lyric_file.write(f"{song_name}\n\n{lyric}")
-            
-            
-    def save_songs_custom(
-        self,
-        prompt: str,
-        genre: str,
-        output_dir: str,
-        instrumental: str = False
-    ) -> None:
-        mp3_index = 0
-        try:
-            self.get_songs_custom(prompt, genre, instrumental)  # make the info dict
-            song_name = self.song_info_dict["song_name"]
-            lyric = self.song_info_dict["lyric"]
-            link = self.song_info_dict["song_url"]
-        except Exception as e:
-            print(e)
-            raise
-        with contextlib.suppress(FileExistsError):
-            os.mkdir(output_dir)
-        print()
-        while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
-            mp3_index += 1
-        print(link)
-        response = rget(link, allow_redirects=False, stream=True)
-        if response.status_code != 200:
-            raise Exception("Could not download song")
-        # save response to file
-        with open(
-            os.path.join(output_dir, f"suno_{mp3_index + 1}.mp3"), "wb"
-        ) as output_file:
-            for chunk in response.iter_content(chunk_size=1024):
-                # If the chunk is not empty, write it to the file.
-                if chunk:
-                    output_file.write(chunk)
-        with open(
-            os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
-            "w",
-            encoding="utf-8",
-        ) as lyric_file:
-            lyric_file.write(f"{song_name}\n\n{lyric}")
-            
-            
-    def get_mp3(self, link: str, stream: bool = False):
-        """
-        Fetches the MP3 file from a given link. Can return the entire file
-        as bytes or stream it in chunks based on the 'stream' parameter.
-
-        :param link: The URL to the MP3 file.
-        :param stream: Determines if the MP3 should be streamed (True) or returned as a full object (False).
-        :return: If stream is False, returns the MP3 file content as bytes.
-                If stream is True, returns a generator yielding the file in chunks.
-        """
-        response = self.session.get(link, stream=True)
-        if response.status_code == 200:
-            if stream:
-                return response.iter_content()
-            else:
-                return b"".join(response.iter_content())
-        else:
-            raise Exception(f"Failed to download MP3 from {link}, status code: {response.status_code}")
 
 
 def main():
@@ -345,6 +264,24 @@ def main():
         type=str,
         default="./output",
     )
+    parser.add_argument(
+        "--is_custom",
+        dest="is_custom",
+        action="store_true",
+        help="use custom mode, need to provide title and tags",
+    )
+    parser.add_argument(
+        "--title",
+        help="Title of the song",
+        type=str,
+        default="",
+    )
+    parser.add_argument(
+        "--tags",
+        help="Tags of the song",
+        type=str,
+        default="",
+    )
 
     args = parser.parse_args()
 
@@ -357,6 +294,9 @@ def main():
     song_generator.save_songs(
         prompt=args.prompt,
         output_dir=args.output_dir,
+        title=args.title,
+        tags=args.tags,
+        is_custom=args.is_custom,
     )
 
 
