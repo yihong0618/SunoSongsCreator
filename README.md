@@ -1,4 +1,5 @@
-**补充了三个参数详见下面的python使用**
+**补充了如下图三个参数详见下面的python使用**
+![image](https://github.com/wlhtea/SunoSongsCreator/assets/115779315/03c0193f-2944-4199-b0fd-5152eae329f4)
 
 # SunoSongsCreator
 About High quality songs generation by https://www.suno.ai/. Reverse engineered API.
@@ -24,6 +25,7 @@ pip install -U suno_songs
 
 Added three parameters: prompt, tags, and title. See the website for details and open Custom Mode to see the meaning of the three parameters.
 The original prompt has been changed to gptprompt.
+![image](https://github.com/wlhtea/SunoSongsCreator/assets/115779315/209b0d93-6e9c-4236-a3a3-88e782afd935)
 
 ```python
 from suno import SongsGen
