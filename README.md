@@ -1,6 +1,7 @@
 **补充了如下图三个参数详见下面的python使用**
 
-<img src="[图片链接](https://github.com/wlhtea/SunoSongsCreator/assets/115779315/03c0193f-2944-4199-b0fd-5152eae329f4)" width="500px" height="500px">
+<img src="https://github.com/wlhtea/SunoSongsCreator/assets/115779315/03c0193f-2944-4199-b0fd-5152eae329f4" width="300">
+
 
 # SunoSongsCreator
 About High quality songs generation by https://www.suno.ai/. Reverse engineered API.
