@@ -12,6 +12,7 @@ from curl_cffi.requests import Cookies
 from fake_useragent import UserAgent
 from requests import get as rget
 from rich import print
+from typing import Union
 
 from dotenv import load_dotenv, find_dotenv
 
@@ -91,7 +92,9 @@ class SongsGen:
     def _parse_lyrics(self, data: dict) -> Tuple[str, str]:
         song_name = data.get("title", "")
         mt = data.get("metadata")
-        if not mt or not song_name:
+        if (
+            not mt
+        ):  # Remove checking for title because custom songs have no title if not specified
             return "", ""
         lyrics = re.sub(r"\[.*?\]", "", mt.get("prompt"))
         return song_name, lyrics
@@ -125,7 +128,7 @@ class SongsGen:
         self.now_data = data
         try:
             for d in data:
-                # only get one url for now
+                # only get one url for now TODO: See if possible for both urls
                 # and early return
                 if audio_url := d.get("audio_url"):
                     song_name, lyric = self._parse_lyrics(d)
@@ -149,7 +152,13 @@ class SongsGen:
             # Done here
             return True
 
-    def get_songs(self, prompt: str) -> dict:
+    def get_songs(
+        self,
+        prompt: str,
+        tags: Union[str, None] = None,
+        title: str = "",
+        is_custom: bool = False,
+    ) -> dict:
         url = f"{base_url}/api/generate/v2/"
         self.session.headers["user-agent"] = ua.random
         payload = {
@@ -158,6 +167,12 @@ class SongsGen:
             "prompt": "",
             "make_instrumental": False,
         }
+        if is_custom:
+            payload["prompt"] = prompt
+            payload["gpt_description_prompt"] = ""
+            payload["title"] = title
+            if not tags:
+                payload["tags"] = "pop"
         response = self.session.post(
             url,
             data=json.dumps(payload),
@@ -195,10 +210,15 @@ class SongsGen:
         self,
         prompt: str,
         output_dir: str,
+        tags: Union[str, None] = None,
+        title: Union[str, None] = None,
+        is_custom: bool = False,
     ) -> None:
         mp3_index = 0
         try:
-            self.get_songs(prompt)  # make the info dict
+            self.get_songs(
+                prompt, tags=tags, title=title, is_custom=is_custom
+            )  # make the info dict
             song_name = self.song_info_dict["song_name"]
             lyric = self.song_info_dict["lyric"]
             link = self.song_info_dict["song_url"]
@@ -222,6 +242,8 @@ class SongsGen:
                 # If the chunk is not empty, write it to the file.
                 if chunk:
                     output_file.write(chunk)
+        if not song_name:
+            song_name = "Untitled"
         with open(
             os.path.join(output_dir, f"{song_name.replace(' ', '_')}.lrc"),
             "w",
@@ -246,6 +268,24 @@ def main():
         type=str,
         default="./output",
     )
+    parser.add_argument(
+        "--is_custom",
+        dest="is_custom",
+        action="store_true",
+        help="use custom mode, need to provide title and tags",
+    )
+    parser.add_argument(
+        "--title",
+        help="Title of the song",
+        type=str,
+        default="",
+    )
+    parser.add_argument(
+        "--tags",
+        help="Tags of the song",
+        type=str,
+        default="",
+    )
 
     args = parser.parse_args()
 
@@ -258,6 +298,9 @@ def main():
     song_generator.save_songs(
         prompt=args.prompt,
         output_dir=args.output_dir,
+        title=args.title,
+        tags=args.tags,
+        is_custom=args.is_custom,
     )
 
 
