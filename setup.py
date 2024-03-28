@@ -2,10 +2,10 @@ from setuptools import find_packages, setup
 
 setup(
     name="suno_songs",
-    version="0.3.0",
+    version="0.3.2",
     author="yihong0618",
     author_email="zouzou0208@gmail.com",
-    description="High quality image generation by ideogram.ai. Reverse engineered API.",
+    description="High quality songs generation by suno.ai. Reverse engineered API.",
     url="https://github.com/yihong0618/SunoSongsCreator",
     project_urls={
         "Bug Report": "https://github.com/yihong0618/SunoSongsCreator/issues/new",
@@ -30,5 +30,6 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
 )

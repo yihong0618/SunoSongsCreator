@@ -88,12 +88,6 @@ class SongsGen:
         data = response.json()
         return data.get("jwt")
 
-    def _renew(self):
-        response = self.session.post(
-            exchange_token_url.format(sid=self.sid), impersonate=browser_version
-        )
-        self.session.headers["Authorization"] = f"Bearer {response.json().get('jwt')}"
-
     @staticmethod
     def parse_cookie_string(cookie_string):
         cookie = SimpleCookie()
@@ -127,22 +121,16 @@ class SongsGen:
         data = response.json()
         if type(data) == dict:
             if data.get("detail", "") == "Unauthorized":
-                print("Token expired, renewing...")
-                self.retry_time += 1
-                if self.retry_time > 2:
-                    song_name, lyric = self._parse_lyrics(self.now_data[0])
-                    self.song_info_dict["song_name"] = song_name
-                    self.song_info_dict["lyric"] = lyric
-                    self.song_info_dict["song_url"] = (
-                        f"https://audiopipe.suno.ai/?item_id={id1}"
-                    )
-                    print("will sleep 30 and try to download")
-                    time.sleep(30)
-                    # Done here
-                    return True
-                self._renew()
-                time.sleep(5)
-                return False
+                song_name, lyric = self._parse_lyrics(self.now_data[0])
+                self.song_info_dict["song_name"] = song_name
+                self.song_info_dict["lyric"] = lyric
+                self.song_info_dict["song_url"] = (
+                    f"https://audiopipe.suno.ai/?item_id={id1}"
+                )
+                print("Token expired, will sleep 30 seconds and try to download")
+                time.sleep(30)
+                # Done here
+                return True
             else:
                 data = [data]
         # renew now data
@@ -162,8 +150,8 @@ class SongsGen:
             print(e)
             # since we only get the music_id is ok
             # so we can make the id here and sleep some time
-            print("Will sleep 45s and get the music url")
-            time.sleep(45)
+            print("Will sleep 30s and get the music url")
+            time.sleep(30)
             song_name, lyric = self._parse_lyrics(self.now_data[0])
             self.song_info_dict["song_name"] = song_name
             self.song_info_dict["lyric"] = lyric
@@ -210,6 +198,7 @@ class SongsGen:
         request_ids = [i["id"] for i in songs_meta_info]
         start_wait = time.time()
         print("Waiting for results...")
+        print(".", end="", flush=True)
         sleep_time = 10
         while True:
             if int(time.time() - start_wait) > 600:
@@ -219,7 +208,7 @@ class SongsGen:
             # spider rule
             if sleep_time > 2:
                 time.sleep(sleep_time)
-                sleep_time -= 2
+                sleep_time -= 1
             else:
                 time.sleep(2)
 
