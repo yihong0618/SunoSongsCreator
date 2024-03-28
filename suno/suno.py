@@ -259,7 +259,7 @@ class SongsGen:
         # old url: https://audiopipe.suno.ai/?item_id=1133478e-ac1f-43df-909b-9fb17dabdc8b
         # cdn url: https://cdn1.suno.ai/1133478e-ac1f-43df-909b-9fb17dabdc8b.mp3
         link = "https://cdn1.suno.ai/" + link.split('=')[-1] + ".mp3"
-        print(link)
+        print(link) 
         # The first visit may fail, multiple attempts to download
         for i in range(10):
             try:
