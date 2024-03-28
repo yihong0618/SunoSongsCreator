@@ -255,17 +255,27 @@ class SongsGen:
         while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
             mp3_index += 1
         print(link)
-        response = rget(link, allow_redirects=False, stream=True)
-        if response.status_code != 200:
-            raise Exception("Could not download song")
-        # save response to file
-        with open(
-            os.path.join(output_dir, f"suno_{mp3_index + 1}.mp3"), "wb"
-        ) as output_file:
-            for chunk in response.iter_content(chunk_size=1024):
-                # If the chunk is not empty, write it to the file.
-                if chunk:
-                    output_file.write(chunk)
+        # because the original link is easy to download failure, replace with a CDN address
+        # old url: https://audiopipe.suno.ai/?item_id=1133478e-ac1f-43df-909b-9fb17dabdc8b
+        # cdn url: https://cdn1.suno.ai/1133478e-ac1f-43df-909b-9fb17dabdc8b.mp3
+        link = "https://cdn1.suno.ai/" + link.split('=')[-1] + ".mp3"
+        print(link)
+        # The first visit may fail, multiple attempts to download
+        for i in range(10):
+            try:
+                response = requests.get(link, stream=True) 
+                code = response.status_code
+                if code != 200:
+                    print(f"download fail, the code is {str(code)}")
+                    time.sleep(10)
+                    continue
+                with open(os.path.join(output_dir, f"suno_{mp3_index + 1}.mp3"), 'wb') as file:
+                    file.write(response.content)
+                    break
+            except:
+                print(f"download fail, wait 10 seconds and try again")
+                time.sleep(10)
+
         if not song_name:
             song_name = "Untitled"
         with open(
