@@ -88,6 +88,11 @@ class SongsGen:
         data = response.json()
         return data.get("jwt")
 
+    def _renew_auth_token(self):
+        auth_token = self._get_auth_token()
+        HEADERS["Authorization"] = f"Bearer {auth_token}"
+        self.session.headers = HEADERS
+
     @staticmethod
     def parse_cookie_string(cookie_string):
         cookie = SimpleCookie()
@@ -96,6 +101,28 @@ class SongsGen:
         for key, morsel in cookie.items():
             cookies_dict[key] = morsel.value
         return Cookies(cookies_dict)
+
+    def get_song_library(self):
+        self._renew_auth_token()
+        page_number = 1
+        result = []
+        while 1:
+            print(f"Getting page {page_number} data.")
+            url = f"https://studio-api.suno.ai/api/feed/?page={page_number}"
+            response = self.session.get(url, impersonate=browser_version)
+            data = response.json()
+            if page_number == 3:
+                break
+            if len(data) < 20:
+                result.extend(data)
+                break
+            # spider rule
+            time.sleep(2)
+            if page_number % 3 == 0:
+                self._renew_auth_token()
+            page_number += 1
+            result.extend(data)
+        return result
 
     def get_limit_left(self) -> int:
         self.session.headers["user-agent"] = ua.random
@@ -166,6 +193,7 @@ class SongsGen:
         prompt: str,
         tags: Union[str, None] = None,
         title: str = "",
+        make_instrumental: bool = False,
         is_custom: bool = False,
     ) -> dict:
         url = f"{base_url}/api/generate/v2/"
@@ -174,7 +202,7 @@ class SongsGen:
             "gpt_description_prompt": prompt,
             "mv": "chirp-v3-0",
             "prompt": "",
-            "make_instrumental": False,
+            "make_instrumental": make_instrumental,
         }
         if is_custom:
             payload["prompt"] = prompt
@@ -225,12 +253,17 @@ class SongsGen:
         output_dir: str = "./output",
         tags: Union[str, None] = None,
         title: Union[str, None] = None,
+        make_instrumental: bool = False,
         is_custom: bool = False,
     ) -> None:
         mp3_index = 0
         try:
             self.get_songs(
-                prompt, tags=tags, title=title, is_custom=is_custom
+                prompt,
+                tags=tags,
+                title=title,
+                is_custom=is_custom,
+                make_instrumental=make_instrumental,
             )  # make the info dict
             song_name = self.song_info_dict["song_name"]
             lyric = self.song_info_dict["lyric"]
@@ -313,6 +346,7 @@ def main():
         output_dir=args.output_dir,
         title=args.title,
         tags=args.tags,
+        make_instrumental=False,
         is_custom=args.is_custom,
     )
 

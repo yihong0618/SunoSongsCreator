@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="suno_songs",
-    version="0.3.2",
+    version="0.4.0",
     author="yihong0618",
     author_email="zouzou0208@gmail.com",
     description="High quality songs generation by suno.ai. Reverse engineered API.",
