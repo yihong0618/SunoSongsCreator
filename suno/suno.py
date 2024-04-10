@@ -21,9 +21,9 @@ _ = load_dotenv(find_dotenv())
 
 ua = UserAgent(browsers=["edge"])
 
-get_session_url = "https://clerk.suno.ai/v1/client?_clerk_js_version=4.70.5"
+get_session_url = "https://clerk.suno.com/v1/client/?_clerk_js_version=4.72.0-snapshot.vc141245"
 exchange_token_url = (
-    "https://clerk.suno.ai/v1/client/sessions/{sid}/tokens/api?_clerk_js_version=4.70.0"
+    "https://clerk.suno.com/v1/client/sessions/{sid}/tokens/api?_clerk_js_version=4.72.0-snapshot.vc141245"
 )
 
 base_url = "https://studio-api.suno.ai"
