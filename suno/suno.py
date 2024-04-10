@@ -69,6 +69,7 @@ class SongsGen:
         self.retry_time = 0
         # make the song_info_dict global since we can get the lyrics and song name first
         self.song_info_dict = {}
+        self.song_info_dict["song_url_list"] = []
         # now data
         self.now_data = {}
 
@@ -142,7 +143,6 @@ class SongsGen:
         return song_name, lyrics
 
     def _fetch_songs_metadata(self, ids):
-        self.song_info_dict["song_url_list"] = []
         id1, id2 = ids[:2]
         url = f"https://studio-api.suno.ai/api/feed/?ids={id1}%2C{id2}"
         response = self.session.get(url, impersonate=browser_version)
@@ -173,6 +173,7 @@ class SongsGen:
                     # for support old api
                     self.song_info_dict["song_url"] = d.get("audio_url")
                 return True
+            return False
         except Exception as e:
             print(e)
             # since we only get the music_id is ok
