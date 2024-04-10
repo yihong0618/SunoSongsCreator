@@ -142,6 +142,7 @@ class SongsGen:
         return song_name, lyrics
 
     def _fetch_songs_metadata(self, ids):
+        self.song_info_dict["song_url_list"] = []
         id1, id2 = ids[:2]
         url = f"https://studio-api.suno.ai/api/feed/?ids={id1}%2C{id2}"
         response = self.session.get(url, impersonate=browser_version)
@@ -163,16 +164,15 @@ class SongsGen:
         # renew now data
         self.now_data = data
         try:
-            for d in data:
-                # only get one url for now TODO: See if possible for both urls
-                # and early return
-                if audio_url := d.get("audio_url"):
+            if all(d.get("audio_url") for d in data):
+                for d in data:
                     song_name, lyric = self._parse_lyrics(d)
                     self.song_info_dict["song_name"] = song_name
                     self.song_info_dict["lyric"] = lyric
-                    self.song_info_dict["song_url"] = audio_url
-                    return True
-            return False
+                    self.song_info_dict["song_url_list"].append(d.get("audio_url"))
+                    # for support old api
+                    self.song_info_dict["song_url"] = d.get("audio_url")
+                return True
         except Exception as e:
             print(e)
             # since we only get the music_id is ok
@@ -182,6 +182,10 @@ class SongsGen:
             song_name, lyric = self._parse_lyrics(self.now_data[0])
             self.song_info_dict["song_name"] = song_name
             self.song_info_dict["lyric"] = lyric
+            self.song_info_dict["song_url_list"] = [
+                f"https://audiopipe.suno.ai/?item_id={id1}",
+                f"https://audiopipe.suno.ai/?item_id={id2}",
+            ]
             self.song_info_dict["song_url"] = (
                 f"https://audiopipe.suno.ai/?item_id={id1}"
             )
@@ -247,43 +251,15 @@ class SongsGen:
         # keep the song info dict as old api
         return self.song_info_dict
 
-    def save_songs(
-        self,
-        prompt: str,
-        output_dir: str = "./output",
-        tags: Union[str, None] = None,
-        title: Union[str, None] = None,
-        make_instrumental: bool = False,
-        is_custom: bool = False,
-    ) -> None:
-        mp3_index = 0
-        try:
-            self.get_songs(
-                prompt,
-                tags=tags,
-                title=title,
-                is_custom=is_custom,
-                make_instrumental=make_instrumental,
-            )  # make the info dict
-            song_name = self.song_info_dict["song_name"]
-            lyric = self.song_info_dict["lyric"]
-            link = self.song_info_dict["song_url"]
-        except Exception as e:
-            print(e)
-            raise
-        with contextlib.suppress(FileExistsError):
-            os.mkdir(output_dir)
-        print()
-        while os.path.exists(os.path.join(output_dir, f"suno_{mp3_index}.mp3")):
-            mp3_index += 1
-        print(link)
+    def _download_suno_song(self, link: str, song_id: str, output_dir: str) -> None:
+        song_name = self.song_info_dict["song_name"]
+        lyric = self.song_info_dict["lyric"]
         response = rget(link, allow_redirects=False, stream=True)
         if response.status_code != 200:
             raise Exception("Could not download song")
         # save response to file
-        with open(
-            os.path.join(output_dir, f"suno_{mp3_index + 1}.mp3"), "wb"
-        ) as output_file:
+        print(f"Downloading song... {song_id}")
+        with open(os.path.join(output_dir, f"suno_{song_id}.mp3"), "wb") as output_file:
             for chunk in response.iter_content(chunk_size=1024):
                 # If the chunk is not empty, write it to the file.
                 if chunk:
@@ -296,6 +272,38 @@ class SongsGen:
             encoding="utf-8",
         ) as lyric_file:
             lyric_file.write(f"{song_name}\n\n{lyric}")
+
+    def save_songs(
+        self,
+        prompt: str,
+        output_dir: str = "./output",
+        tags: Union[str, None] = None,
+        title: Union[str, None] = None,
+        make_instrumental: bool = False,
+        is_custom: bool = False,
+    ) -> None:
+        try:
+            self.get_songs(
+                prompt,
+                tags=tags,
+                title=title,
+                is_custom=is_custom,
+                make_instrumental=make_instrumental,
+            )  # make the info dict
+            link_list = self.song_info_dict["song_url_list"]
+        except Exception as e:
+            print(e)
+            raise
+        with contextlib.suppress(FileExistsError):
+            os.mkdir(output_dir)
+        print()
+        print(link_list)
+        for link in link_list:
+            if link.endswith(".mp3"):
+                mp3_id = link.split("/")[-1][:-4]
+            else:
+                mp3_id = link.split("=")[-1]
+            self._download_suno_song(link, mp3_id, output_dir)
 
 
 def main():
