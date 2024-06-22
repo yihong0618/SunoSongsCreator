@@ -205,7 +205,7 @@ class SongsGen:
         self.session.headers["user-agent"] = ua.random
         payload = {
             "gpt_description_prompt": prompt,
-            "mv": "chirp-v3-0",
+            "mv": "chirp-v3-5",
             "prompt": "",
             "make_instrumental": make_instrumental,
         }
